@@ -13,13 +13,15 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\rproduct.proto\"2\n\x07product\x12\n\n\x02id\x18\x01 \x01(\x05\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\r\n\x05price\x18\x03 \x01(\x02\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\rproduct.proto\"L\n\x07product\x12\n\n\x02id\x18\x01 \x01(\x05\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\r\n\x05price\x18\x03 \x01(\x02\x12\x18\n\x04type\x18\x04 \x01(\x0e\x32\n.Operation*9\n\tOperation\x12\x0b\n\x07UNKNOWN\x10\x00\x12\x07\n\x03PUT\x10\x01\x12\n\n\x06\x44\x45LETE\x10\x02\x12\n\n\x06\x43REATE\x10\x03\x62\x06proto3')
 
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'product_pb2', globals())
 if _descriptor._USE_C_DESCRIPTORS == False:
 
   DESCRIPTOR._options = None
+  _OPERATION._serialized_start=95
+  _OPERATION._serialized_end=152
   _PRODUCT._serialized_start=17
-  _PRODUCT._serialized_end=67
+  _PRODUCT._serialized_end=93
 # @@protoc_insertion_point(module_scope)

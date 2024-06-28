@@ -1,25 +1,51 @@
 # main.py
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
-from typing import AsyncGenerator
+from fastapi import FastAPI, HTTPException
 from aiokafka import AIOKafkaConsumer
-from sqlmodel import SQLModel, Field, create_engine, Session
+from sqlmodel import SQLModel,select, Field, create_engine, Session
 from consumer_service import settings, product_pb2
 import asyncio
 from typing import Optional
 import logging
+from consumer_service.product_pb2 import Operation 
 
-class Products(SQLModel, Table=True):
+# from product_pb2 import Operation 
+
+
+class Products(SQLModel, table=True):
     id:Optional[int] = Field(default= None, primary_key= True)
     name: str = Field()
     price:float = Field()
 
+# class User(SQLModel, table=True):
+#     id: int = Field(default=None, primary_key=True)
+#     email: str = Field(index=True, unique=True)
+#     hashed_password: str
+
+# class Token(SQLModel, table=True):
+#     access_token: str
+#     token_type: str
+# 
 
 connection_string=str(settings.DATABASE_URL)
 engine = create_engine(connection_string, pool_recycle=300, echo=True)
 def create_tables():
     SQLModel.metadata.create_all(engine)
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    loop = asyncio.get_event_loop()
+    task = loop.create_task(consume_messages())
+    print('Creating Tables')
+    create_tables()
+    print("Tables Created")
+    yield
+    task.cancel()
+    await task
+
+
+app = FastAPI(lifespan=lifespan, title="Kafka consumer with database", 
+    version="0.0.01",)
 
 async def consume_messages():
     # Create a consumer instance.
@@ -33,53 +59,39 @@ async def consume_messages():
     )
     # Start the consumer.
     await consumer.start()
-    print("consumer started")
     try:
-        # Continuously listen for messages.
-        async for msg in consumer:
-            product = product_pb2.product()
-            product.ParseFromString(msg.value)            
-            data_from_producer=Products(name= product.name, price=product.price)
-            logging.info(f"Received message from Kafka: {msg.value}")  
-            print(f"Received message from Kafka: {msg.value}")
-            # Here you can add code to process each message.
-
         with Session(engine) as session:
-            session.add(data_from_producer)
-            session.commit()
-            session.refresh(data_from_producer)
-            print(f'''Stored Protobuf data in database with ID: {data_from_producer.id}''')
-    except Exception as e:  # Catch deserialization errors
-                print(f"Error processing message: {e}")
+        # Continuously listen for messages.
+            async for msg in consumer:
+                if msg.value is not None:
+                    try:
+                        product = product_pb2.product()
+                        product.ParseFromString(msg.value)            
+                        data_from_producer=Products(id=product.id, name= product.name, price=product.price)
+                        
+                        if product.type == product_pb2.Operation.CREATE:
+                                session.add(data_from_producer)
+                                session.commit()
+                                session.refresh(data_from_producer)
+                                print(f'''Stored Protobuf data in database with ID: {data_from_producer.id}''')
 
+                        elif product.type== product_pb2.Operation.DELETE:
+                                product_to_delete = session.get(Products, product.id)
+                                if product_to_delete:
+                                    session.delete(product_to_delete)
+                                    session.commit()
+                                    logging.info(f"Deleted product with ID: {product.id}")
+                                else:
+                                    logging.warning(f"Product with ID {product.id} not found for deletion")
+                        elif product.type== product_pb2.Operation.PUT:
+                            ...
+
+                    except (google.protobuf.message.DecodeError) as e:
+                        logging.error(f"Error deserializing messages")
+                else :
+                    print("Msg has no value")
+    except Exception as e: 
+        logging.error(f"Error consuming messages: {e}")
     finally:
         # Ensure to close the consumer when done.
-        await consumer.stop()
-
-
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    print('Creating Tables')
-    create_tables()
-    print("Tables Created")
-    loop = asyncio.get_event_loop()
-    task = loop.create_task(consume_messages())
-    yield
-    task.cancel()
-    await task
-
-
-app = FastAPI(lifespan=lifespan, title="Kafka consumer with database", 
-    version="0.0.01",)
-
-
-# Kafka Producer as a dependency
-# async def get_kafka_producer():
-#     producer = AIOKafkaProducer(bootstrap_servers='broker:19092')
-#     await producer.start()
-#     try:
-#         yield producer
-#     finally:
-#         await producer.stop()
+            await consumer.stop()
