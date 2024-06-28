@@ -84,7 +84,17 @@ async def consume_messages():
                                 else:
                                     logging.warning(f"Product with ID {product.id} not found for deletion")
                         elif product.type== product_pb2.Operation.PUT:
-                            ...
+                                db_product = session.get(Products, product.id)
+                                if db_product:
+                                    db_product.id = product.id
+                                    db_product.name = product.name
+                                    db_product.price = product.price
+                                    session.add(db_product)
+                                    session.commit()
+                                    session.refresh(db_product)
+                                    logging.info(f"Updated product with ID: {product.id}")
+                                else:
+                                    logging.warning(f"Product with ID {product.id} not found for update")
 
                     except (google.protobuf.message.DecodeError) as e:
                         logging.error(f"Error deserializing messages")

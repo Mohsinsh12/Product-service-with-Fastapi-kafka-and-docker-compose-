@@ -97,11 +97,27 @@ async def Create_product(
 
 @app.delete('/products/')
 async def delete_product(id: int, producer: Annotated[AIOKafkaProducer, Depends(kafka_producer)]):
-    product_proto = product_pb2.product()
-    product_proto.id = id
-    product_proto.type = product_pb2.Operation.DELETE
+    deleted_product = product_pb2.product()
+    deleted_product.id = id
+    deleted_product.type = product_pb2.Operation.DELETE
 
-    serialized_product = product_proto.SerializeToString()
+    serialized_product = deleted_product.SerializeToString()
     await producer.send_and_wait(settings.KAFKA_ORDER_TOPIC, serialized_product)
 
     return {"Product" : "Deleted"}
+
+@app.put("/products/{product_id}", response_model=Products)
+async def update_product(
+    product_id: int,
+    updated_product: Products,  
+    producer: Annotated[AIOKafkaProducer, Depends(kafka_producer)],
+):
+    product=product_pb2.product()
+    product.id = product_id
+    product.name = updated_product.name
+    product.price = updated_product.price
+    product.type = product_pb2.Operation.PUT 
+
+    serialized_product = product.SerializeToString()
+    await producer.send_and_wait(settings.KAFKA_ORDER_TOPIC, serialized_product)
+    return updated_product 
